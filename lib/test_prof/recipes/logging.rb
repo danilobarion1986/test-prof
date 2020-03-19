@@ -37,7 +37,9 @@ module TestProf
             defined?(::ActionView::Base) && ::ActionView::Base,
             defined?(::ActionMailer::Base) && ::ActionMailer::Base,
             defined?(::ActionCable::Server::Base.config) && ::ActionCable::Server::Base.config,
-            defined?(::ActiveStorage) && ::ActiveStorage
+            defined?(::ActiveStorage) && ::ActiveStorage,
+            defined?(::ActiveStorage) && ::ActiveStorage,
+            defined?(::Sequel::Model.db) && ::Sequel::Model.db
           ].compact
         end
         # rubocop:enable Metrics/CyclomaticComplexity
@@ -45,7 +47,7 @@ module TestProf
 
         def swap_logger(loggables)
           loggables.map do |loggable|
-            was_logger = loggable.logger
+            was_logger = loggable.logger unless loggable.is_a?(Sequel::Model.db.class)
             loggable.logger = logger
             was_logger
           end
@@ -101,10 +103,25 @@ TestProf.activate("LOG", "all") do
   ActiveSupport::LogSubscriber.logger =
     Rails.logger =
       ActiveRecord::Base.logger = TestProf::Rails::LoggingHelpers.logger
+rescue NameError => ex
+  include ::TestProf::Logging
+  log :warn, ex.message
 end
 
 TestProf.activate("LOG", "ar") do
   TestProf.log :info, "Active Record verbose logging enabled"
   ActiveSupport::LogSubscriber.logger =
     ActiveRecord::Base.logger = TestProf::Rails::LoggingHelpers.logger
+rescue NameError => ex
+  include ::TestProf::Logging
+  log :warn, ex.message
+end
+
+TestProf.activate("LOG", "sequel") do
+  TestProf.log :info, "Sequel verbose logging enabled"
+  ActiveSupport::LogSubscriber.logger =
+    Sequel::Model.db.logger = TestProf::Rails::LoggingHelpers.logger
+rescue NameError => ex
+  include ::TestProf::Logging
+  log :warn, ex.message
 end
